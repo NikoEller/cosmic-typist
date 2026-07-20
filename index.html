@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Cosmic Typist – ein lokales Weltraum-Tipptraining.">
+  <title>Cosmic Typist</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="Cosmic Typist Startseite">✦ COSMIC <strong>TYPIST</strong></a>
+      <dl class="stats" aria-label="Spielwerte">
+        <div><dt>Score</dt><dd id="score">000000</dd></div>
+        <div><dt>WPM</dt><dd id="wpm">0</dd></div>
+        <div><dt>Streak</dt><dd id="streak">× 0</dd></div>
+        <div><dt>Schild</dt><dd id="health">♥ ♥ ♥</dd></div>
+      </dl>
+    </header>
+
+    <section id="arena" class="arena" aria-label="Spielfeld">
+      <div class="nebula nebula-left"></div>
+      <div class="nebula nebula-right"></div>
+      <p class="sector-label">SEKTOR <span id="level">01</span></p>
+      <div id="enemies" aria-hidden="true"></div>
+      <div id="effects" aria-hidden="true"></div>
+      <div id="ship" aria-hidden="true"><span class="ship-body">▲</span><span class="engine"></span></div>
+      <div id="damageFlash" aria-hidden="true"></div>
+
+      <section id="startScreen" class="overlay" aria-labelledby="startTitle">
+        <p class="eyebrow">MISSION BEREIT</p>
+        <h1 id="startTitle">Tippe. Triff.<br><em>Überlebe.</em></h1>
+        <p class="intro">Zerstöre die anfliegenden Objekte, indem du ihre Wörter korrekt tippst.</p>
+        <div class="mode-actions" aria-label="Spielmodus wählen">
+          <button class="mode-button" type="button" data-mode="practice">
+            Endlos-Training <span>∞</span><small>Passt sich deinem Tempo an</small>
+          </button>
+          <button class="mode-button mode-button--challenge" type="button" data-mode="challenge">
+            Challenge <span>⚡</span><small>Wird stetig schneller</small>
+          </button>
+        </div>
+        <section class="highscores" aria-labelledby="highscoreTitle">
+          <p id="highscoreTitle" class="eyebrow">LOKALE BESTENLISTE</p>
+          <ol id="highscoreList"><li>Highscores werden geladen …</li></ol>
+        </section>
+      </section>
+
+      <section id="gameOverScreen" class="overlay is-hidden" aria-labelledby="gameOverTitle">
+        <p class="eyebrow">MISSION BEENDET</p>
+        <h2 id="gameOverTitle">Dein Score: <span id="finalScore">0</span></h2>
+        <p id="missionNote"></p>
+        <button id="restartButton" type="button">Mission wiederholen <span>↻</span></button>
+        <button id="menuButton" class="text-button" type="button">Modus wechseln</button>
+      </section>
+    </section>
+
+    <section class="command-bar" aria-label="Tippsteuerung">
+      <div class="target-display"><span class="label">ZIEL</span><strong id="targetWord">Warte auf den Start …</strong></div>
+      <label class="typing-field" for="typingInput">
+        <span class="sr-only">Wort des Ziels eingeben</span>
+        <input id="typingInput" type="text" autocomplete="off" autocapitalize="off"
+               spellcheck="false" placeholder="Wort hier tippen …" disabled>
+      </label>
+      <div class="accuracy-display"><span class="label">GENAUIGKEIT</span><strong id="accuracy">100%</strong></div>
+    </section>
+    <p class="hint">Tipp: Tippe ein passendes Wort. <kbd>Esc</kbd> pausiert die Mission.</p>
+    <p id="statusMessage" class="sr-only" aria-live="polite"></p>
+  </main>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
