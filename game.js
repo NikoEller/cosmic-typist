@@ -2,6 +2,7 @@ import { pickWord } from './words.js';
 
 const $ = (id) => document.getElementById(id);
 const BROWSER_HIGHSCORE_KEY = 'cosmic-typist-highscores-v1';
+const WPM_WINDOW_MS = 30_000;
 
 const ui = {
   arena: $('arena'),
@@ -37,6 +38,7 @@ const state = {
   shields: 3,
   typedCharacters: 0,
   mistakes: 0,
+  correctKeyTimes: [],
   enemies: [],
   startedAt: 0,
   pausedAt: 0,
@@ -59,9 +61,17 @@ function elapsedMilliseconds() {
 }
 
 function getWpm() {
-  const minutes = elapsedMilliseconds() / 60_000;
-  const correctCharacters = Math.max(0, state.typedCharacters - state.mistakes);
-  return minutes > 0 ? Math.round((correctCharacters / 5) / minutes) : 0;
+  const now = performance.now();
+  const windowStart = now - WPM_WINDOW_MS;
+
+  // Eine gleitende Messung zeigt die aktuelle Schreibgeschwindigkeit. Ein
+  // langsamer Missionsstart kann die Anzeige damit nicht dauerhaft bremsen.
+  state.correctKeyTimes = state.correctKeyTimes.filter((time) => time >= windowStart);
+  const measuredMilliseconds = Math.min(WPM_WINDOW_MS, elapsedMilliseconds());
+
+  return measuredMilliseconds > 0
+    ? Math.round((state.correctKeyTimes.length / 5) / (measuredMilliseconds / 60_000))
+    : 0;
 }
 
 function getAccuracy() {
@@ -89,6 +99,7 @@ function resetMission() {
   state.shields = 3;
   state.typedCharacters = 0;
   state.mistakes = 0;
+  state.correctKeyTimes = [];
   state.enemies = [];
   state.lastInputValue = '';
   state.hasSubmittedScore = false;
@@ -372,6 +383,7 @@ function handleInput() {
       ui.input.classList.add('is-invalid');
       window.setTimeout(() => ui.input.classList.remove('is-invalid'), 180);
     } else {
+      state.correctKeyTimes.push(performance.now());
       fireLaser(target);
     }
   }
