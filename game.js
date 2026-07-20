@@ -111,8 +111,10 @@ function getPace() {
   const wpm = getWpm();
   const needsRelief = state.shields < 2 || getAccuracy() < 88;
   return {
-    // Das Training reagiert auf Tempo und Fehler, bleibt aber in festen Grenzen.
-    spawnInterval: Math.round(clamp(2_850 - wpm * 10 + (needsRelief ? 350 : 0), 1_900, 3_100)),
+    // Die anfängliche Spawnrate muss genug Wörter liefern, damit schnelle
+    // Spieler ihre tatsächliche WPM erreichen können. Fehler und wenige
+    // Schilde verlangsamen nur behutsam, statt das Training zu blockieren.
+    spawnInterval: Math.round(clamp(1_350 - wpm * 4.5 + (needsRelief ? 250 : 0), 850, 1_700)),
     speed: clamp(3.5 + wpm / 50 - (needsRelief ? .55 : 0), 3.0, 5.15),
     maximumEnemies: needsRelief ? 4 : 5
   };
@@ -140,7 +142,9 @@ function findFreePosition() {
   for (let attempt = 0; attempt < 18; attempt += 1) {
     const candidate = minimumX + Math.random() * (maximumX - minimumX);
     const overlaps = state.enemies.some((enemy) => (
-      enemy.y < 16 && Math.abs(enemy.x - candidate) < minimumDistance
+      // Erst bei weniger als neun Prozent Höhenabstand könnten sich zwei
+      // Wortkarten sichtbar überlagern.
+      enemy.y < -5 && Math.abs(enemy.x - candidate) < minimumDistance
     ));
     if (!overlaps) return candidate;
   }
