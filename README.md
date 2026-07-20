@@ -26,6 +26,12 @@ python3 app.py
 Danach im Browser http://127.0.0.1:8000 öffnen. Der Server akzeptiert nur
 Verbindungen vom eigenen Rechner.
 
+Die statische Online-Demo läuft über GitHub Pages:
+https://nikoeller.github.io/cosmic-typist/
+
+Auf GitHub Pages werden Highscores nur im Browser-Speicher abgelegt. Die
+lokale Python-Version verwendet weiterhin die Datei data/highscores.json.
+
 ## Steuerung
 
 | Aktion | Steuerung |
