@@ -20,6 +20,7 @@ export const WORD_GROUPS = {
     'sonne', 'stern', 'tastatur', 'vogel', 'wald', 'wasser', 'wind', 'wolke'
   ],
   medium: [
+    // Mittlere Wörter steigern die Fingerkoordination ohne die Runde zu bremsen.
     'abenteuer', 'antrieb', 'astronaut', 'atmosphäre', 'batterie', 'browser',
     'datenbank', 'energie', 'entdecken', 'fahrrad', 'galaxie', 'geschichte',
     'internet', 'kamera', 'konzentration', 'lichtjahr', 'meteor', 'mission',
@@ -27,6 +28,7 @@ export const WORD_GROUPS = {
     'schwerkraft', 'signal', 'software', 'sonnenwind', 'sternbild', 'zitrone'
   ],
   hard: [
+    // Lange Fach- und Weltraumwörter: Durch game.js ist höchstens eines aktiv.
     'algorithmus', 'astronomie', 'ausdauer', 'bildschirm', 'fortschritt',
     'freiheit', 'geschwindigkeit', 'hardware', 'konstellation', 'kosmonaut',
     'mondbasis', 'sonnensystem', 'teleskop', 'universum', 'wunder',

@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Die Seite ist in Header, Spielfeld und Steuerleiste getrennt, damit
+       Screenreader und CSS eine nachvollziehbare Struktur erhalten. -->
   <main class="app-shell">
     <header class="app-header">
       <a class="brand" href="/" aria-label="Cosmic Typist Startseite">✦ COSMIC <strong>TYPIST</strong></a>
@@ -19,6 +21,7 @@
       </dl>
     </header>
 
+    <!-- Die Arena enthält nur visuelle Spielelemente und die beiden Dialoge. -->
     <section id="arena" class="arena" aria-label="Spielfeld">
       <div class="nebula nebula-left"></div>
       <div class="nebula nebula-right"></div>
@@ -55,6 +58,7 @@
       </section>
     </section>
 
+    <!-- Das Eingabefeld bleibt ein echtes Label/Input-Paar für Tastatur und Assistenztechnik. -->
     <section class="command-bar" aria-label="Tippsteuerung">
       <div class="target-display"><span class="label">ZIEL</span><strong id="targetWord">Warte auf den Start …</strong></div>
       <label class="typing-field" for="typingInput">

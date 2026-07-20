@@ -17,9 +17,13 @@ import os
 import tempfile
 
 
+# Alle Pfade sind an die Projektdatei gebunden, nicht an das aktuelle Terminal-
+# Verzeichnis. Damit startet der Server zuverlässig aus jedem Arbeitsordner.
 ROOT = Path(__file__).parent.resolve()
 DATA_DIRECTORY = ROOT / "data"
 HIGHSCORE_FILE = DATA_DIRECTORY / "highscores.json"
+# Kleine Obergrenzen schützen den lokalen Server vor versehentlich großen oder
+# manipulierten Requests und halten die Bestenliste übersichtlich.
 MAX_REQUEST_BYTES = 4_096
 MAX_HIGHSCORES = 10
 VALID_MODES = {"practice", "challenge"}
@@ -50,6 +54,8 @@ class HighscoreStore:
             if not isinstance(raw_scores, list):
                 return []
 
+            # Selbst wenn eine Datei manuell verändert wurde, gelangen nur
+            # vollständig geprüfte Einträge zurück an den Browser.
             valid_scores = [
                 entry for entry in raw_scores if self._is_valid_entry(entry)
             ]
@@ -69,6 +75,7 @@ class HighscoreStore:
 
     @staticmethod
     def _is_valid_entry(entry: object) -> bool:
+        """Erlaubt nur die drei erwarteten Felder mit sicheren Basistypen."""
         if not isinstance(entry, dict):
             return False
 
@@ -100,6 +107,8 @@ class HighscoreStore:
                 temporary_file.write("\n")
                 temporary_file.flush()
                 os.fsync(temporary_file.fileno())
+            # os.replace ist auf demselben Dateisystem atomar: Es gibt nie
+            # eine halb geschriebene Highscore-Datei als Endzustand.
             os.replace(temporary_name, self.file_path)
         except OSError:
             try:
@@ -118,6 +127,7 @@ class CosmicTypistHandler(SimpleHTTPRequestHandler):
     server_version = "CosmicTypist/1.0"
 
     def end_headers(self) -> None:
+        """Setzt Sicherheitsheader für jede HTML-, API- und JavaScript-Antwort."""
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
@@ -130,6 +140,7 @@ class CosmicTypistHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self) -> None:
+        """Routet entweder zur API oder zur bewusst kleinen Freigabeliste."""
         path = urlparse(self.path).path
         if path == "/api/highscores":
             self._send_json(HIGHSCORES.load())
@@ -137,6 +148,7 @@ class CosmicTypistHandler(SimpleHTTPRequestHandler):
         self._send_static_file(path)
 
     def do_POST(self) -> None:
+        """Die einzige schreibende Route ist das Speichern eines Highscores."""
         if urlparse(self.path).path != "/api/highscores":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -158,6 +170,8 @@ class CosmicTypistHandler(SimpleHTTPRequestHandler):
 
     def _read_highscore_request(self) -> dict[str, int | str] | None:
         """Prüft Größe, JSON-Format und Datentypen einer API-Anfrage."""
+        # Content-Length wird vor dem Lesen geprüft, damit keine großen Bodies
+        # unnötig in den Speicher gelangen.
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
@@ -183,6 +197,7 @@ class CosmicTypistHandler(SimpleHTTPRequestHandler):
         return payload
 
     def _send_json(self, payload: object, status: HTTPStatus = HTTPStatus.OK) -> None:
+        """Serialisiert API-Antworten konsistent mit UTF-8 und korrekter Länge."""
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -192,6 +207,8 @@ class CosmicTypistHandler(SimpleHTTPRequestHandler):
 
     def _send_static_file(self, request_path: str) -> None:
         """Liefert ausschließlich die für das Spiel benötigten öffentlichen Dateien."""
+        # Keine freie Pfadauflösung: Quellcode, Tests und lokale Daten lassen
+        # sich über den Webserver deshalb nicht abrufen.
         filename = PUBLIC_FILES.get(request_path)
         if filename is None:
             self.send_error(HTTPStatus.NOT_FOUND)
@@ -218,6 +235,7 @@ class LocalServer(ThreadingHTTPServer):
 
 
 def run_server(port: int = 8000) -> None:
+    """Startet den Threading-Server ausschließlich auf dem lokalen Interface."""
     os.chdir(ROOT)
     server = LocalServer(("127.0.0.1", port), CosmicTypistHandler)
     print(f"Cosmic Typist läuft unter http://127.0.0.1:{port}")

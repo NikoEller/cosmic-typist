@@ -1,9 +1,18 @@
-import { pickWord } from './words.js';
+/**
+ * Hauptmodul des Spiels.
+ *
+ * Diese Datei enthält absichtlich nur Ablauf, Zustand und Anzeige. Die
+ * Wortdaten liegen separat in words.js, damit sie ohne Spiellogik geändert
+ * oder erweitert werden können.
+ */
+import { WORD_GROUPS, pickWord } from './words.js';
 
 const $ = (id) => document.getElementById(id);
 const BROWSER_HIGHSCORE_KEY = 'cosmic-typist-highscores-v1';
 const WPM_WINDOW_MS = 30_000;
 
+// Alle DOM-Referenzen werden einmal gesammelt. So bleibt der Spielcode frei
+// von verstreuten document.getElementById-Aufrufen.
 const ui = {
   arena: $('arena'),
   enemyLayer: $('enemies'),
@@ -28,6 +37,8 @@ const ui = {
   menuButton: $('menuButton')
 };
 
+// Der gesamte veränderliche Spielzustand befindet sich an einer Stelle.
+// Das macht Neustarts, Pausen und spätere Erweiterungen besser nachvollziehbar.
 const state = {
   active: false,
   paused: false,
@@ -50,10 +61,12 @@ const state = {
   animationFrame: 0
 };
 
+/** Begrenzt eine Zahl auf einen sicheren Wertebereich. */
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/** Ermittelt die aktive Missionszeit; Pausen zählen nicht zur WPM-Zeit. */
 function elapsedMilliseconds() {
   if (!state.startedAt) return 0;
   const pauseTime = state.paused ? performance.now() - state.pausedAt : 0;
@@ -74,15 +87,18 @@ function getWpm() {
     : 0;
 }
 
+/** Berechnet die Genauigkeit aus allen tatsächlich eingegebenen Zeichen. */
 function getAccuracy() {
   if (!state.typedCharacters) return 100;
   return Math.round(100 * (state.typedCharacters - state.mistakes) / state.typedCharacters);
 }
 
+/** Meldet Spielereignisse für Screenreader über den aria-live-Bereich. */
 function announce(message) {
   ui.status.textContent = message;
 }
 
+/** Aktualisiert alle sichtbaren Zahlen in der Kopf- und Steuerleiste. */
 function updateHud() {
   ui.score.textContent = String(state.score).padStart(6, '0');
   ui.wpm.textContent = getWpm();
@@ -92,6 +108,7 @@ function updateHud() {
   ui.level.textContent = String(1 + Math.floor(state.score / 1_000)).padStart(2, '0');
 }
 
+/** Entfernt alte Gegner/Effekte und setzt jeden Wert vor einem Neustart zurück. */
 function resetMission() {
   state.score = 0;
   state.streak = 0;
@@ -109,6 +126,12 @@ function resetMission() {
   updateHud();
 }
 
+/**
+ * Liefert Tempo und Gegnerlimit für den aktuellen Modus.
+ *
+ * Challenge skaliert mit dem Score. Das Training nimmt WPM, Genauigkeit und
+ * Schilde als Signal und bleibt durch clamp bewusst innerhalb fairer Grenzen.
+ */
 function getPace() {
   if (state.mode === 'challenge') {
     const progression = clamp(state.score / 12_000, 0, 1.2);
@@ -131,19 +154,62 @@ function getPace() {
   };
 }
 
-function getDifficulty() {
+/**
+ * Definiert die prozentuale Mischung der Wortgruppen.
+ * Auch sehr schnelle Spieler bekommen überwiegend kurze und mittlere Wörter.
+ */
+function getWordGroupWeights() {
   if (state.mode === 'challenge') {
-    if (state.score > 7_000) return 'hard';
-    if (state.score > 2_000) return 'medium';
-    return 'easy';
+    if (state.score > 7_000) return { easy: 30, medium: 60, hard: 10 };
+    if (state.score > 2_000) return { easy: 45, medium: 50, hard: 5 };
+    return { easy: 70, medium: 30, hard: 0 };
   }
 
   const wpm = getWpm();
-  if (wpm >= 65) return 'hard';
-  if (wpm >= 30) return 'medium';
-  return 'easy';
+  if (wpm >= 65) return { easy: 30, medium: 60, hard: 10 };
+  if (wpm >= 30) return { easy: 55, medium: 43, hard: 2 };
+  return { easy: 80, medium: 20, hard: 0 };
 }
 
+/** Zieht anhand der Gewichtung eine der drei Wortgruppen. */
+function chooseWordGroup() {
+  const weights = getWordGroupWeights();
+  const randomValue = Math.random() * 100;
+
+  if (randomValue < weights.easy) return 'easy';
+  if (randomValue < weights.easy + weights.medium) return 'medium';
+  return 'hard';
+}
+
+/**
+ * Wählt ein Wort für einen neuen Gegner.
+ *
+ * Wörter mit mindestens zehn Zeichen gelten als lang. Es kann höchstens eines
+ * gleichzeitig sichtbar sein, damit Challenge fordernd, aber lesbar bleibt.
+ */
+function chooseWord() {
+  const hasLongWordOnScreen = state.enemies.some(
+    (enemy) => !enemy.destroyed && enemy.word.length >= 10
+  );
+
+  // Selbst im späteren Challenge-Modus bleibt maximal ein langes Wort aktiv.
+  // Die Schleife versucht mehrfach, ein geeignetes kürzeres Wort zu wählen.
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const group = hasLongWordOnScreen ? (Math.random() < .55 ? 'easy' : 'medium') : chooseWordGroup();
+    const word = pickWord(group);
+
+    if (!hasLongWordOnScreen || word.length < 10) return word;
+  }
+
+  // Ein sicherer Rückfall verhindert, dass ein Gegner gar nicht entsteht,
+  // falls die Wortlisten später verändert werden.
+  return WORD_GROUPS.easy.find((word) => word.length < 10) || 'stern';
+}
+
+/**
+ * Sucht eine freie horizontale Spawnposition.
+ * Prozentwerte machen die Berechnung unabhängig von der Bildschirmbreite.
+ */
 function findFreePosition() {
   const minimumX = 9;
   const maximumX = 80;
@@ -162,6 +228,10 @@ function findFreePosition() {
   return null;
 }
 
+/**
+ * Baut einen Gegner komplett über DOM-Methoden auf.
+ * textContent verhindert dabei, dass Wortdaten als HTML interpretiert werden.
+ */
 function createEnemy() {
   const x = findFreePosition();
   if (x === null) return false;
@@ -173,7 +243,7 @@ function createEnemy() {
 
   element.className = 'enemy' + (isComet ? ' enemy--comet' : '');
   wordLabel.className = 'enemy__word';
-  wordLabel.textContent = pickWord(getDifficulty());
+  wordLabel.textContent = chooseWord();
   object.className = 'enemy__object';
   object.textContent = isComet ? '☄' : '✦';
   element.append(wordLabel, object);
@@ -194,6 +264,10 @@ function createEnemy() {
   return true;
 }
 
+/**
+ * Ermittelt das passendste Ziel für die aktuelle Eingabe.
+ * Bei mehreren passenden Wörtern hat das weiter unten stehende Ziel Vorrang.
+ */
 function findTarget(input) {
   if (!input) return null;
   return state.enemies
@@ -201,6 +275,7 @@ function findTarget(input) {
     .sort((first, second) => second.y - first.y)[0] ?? null;
 }
 
+/** Hebt das aktuell passende Ziel hervor und aktualisiert den Zieltext. */
 function updateTarget() {
   const input = ui.input.value.toLowerCase();
   const target = findTarget(input);
@@ -215,11 +290,13 @@ function updateTarget() {
   return target;
 }
 
+/** Entfernt ein Objekt sowohl aus dem DOM als auch aus dem Spielzustand. */
 function removeEnemy(enemy) {
   enemy.element.remove();
   state.enemies = state.enemies.filter((current) => current !== enemy);
 }
 
+/** Vergibt Punkte, startet die Explosionsanimation und leert die Eingabe. */
 function destroyEnemy(enemy) {
   if (enemy.destroyed) return;
 
@@ -237,6 +314,7 @@ function destroyEnemy(enemy) {
   announce('Ziel zerstört. Streak ' + state.streak + '.');
 }
 
+/** Fügt einen kurzlebigen visuellen Effekt an einer Arena-Position ein. */
 function addEffect(className, x, y, removeAfter) {
   const effect = document.createElement('span');
   effect.className = className;
@@ -246,6 +324,10 @@ function addEffect(className, x, y, removeAfter) {
   window.setTimeout(() => effect.remove(), removeAfter);
 }
 
+/**
+ * Ermittelt Start- und Zielkoordinaten relativ zur Arena und animiert Laser,
+ * Mündungsblitz und Einschlag unabhängig von der Fenstergröße.
+ */
 function fireLaser(target) {
   const arenaBox = ui.arena.getBoundingClientRect();
   const shipBox = ui.ship.getBoundingClientRect();
@@ -268,6 +350,7 @@ function fireLaser(target) {
   window.setTimeout(() => laser.remove(), 260);
 }
 
+/** Zieht einen Schild ab und beendet die Mission erst beim letzten Treffer. */
 function damageShip() {
   state.shields -= 1;
   state.streak = 0;
@@ -280,6 +363,7 @@ function damageShip() {
   else announce('Treffer am Schiff. Noch ' + state.shields + ' Schilde.');
 }
 
+/** Bewegt Gegner zeitbasiert; dadurch bleibt ihr Tempo bei FPS-Schwankungen stabil. */
 function moveEnemies(deltaMilliseconds) {
   state.enemies.slice().forEach((enemy) => {
     if (!state.active || enemy.destroyed) return;
@@ -293,6 +377,11 @@ function moveEnemies(deltaMilliseconds) {
   });
 }
 
+/**
+ * Zentrale requestAnimationFrame-Schleife.
+ * Das Delta wird begrenzt, damit ein inaktiver Browser-Tab keine Gegner
+ * beim Zurückkehren durch das gesamte Spielfeld springen lässt.
+ */
 function loop(timestamp) {
   if (!state.active) return;
 
@@ -315,6 +404,7 @@ function loop(timestamp) {
   state.animationFrame = requestAnimationFrame(loop);
 }
 
+/** Startet einen Modus und gibt den Tastaturfokus direkt an das Eingabefeld. */
 function startGame(mode) {
   resetMission();
   state.mode = mode;
@@ -336,6 +426,7 @@ function startGame(mode) {
   state.animationFrame = requestAnimationFrame(loop);
 }
 
+/** Schließt die Mission ab und speichert einen positiven Score genau einmal. */
 function endGame() {
   if (!state.active) return;
 
@@ -349,6 +440,7 @@ function endGame() {
   saveHighscore();
 }
 
+/** Pausiert die Mission oder setzt sie fort, ohne die WPM-Zeit zu verfälschen. */
 function togglePause() {
   if (!state.active) return;
   state.paused = !state.paused;
@@ -368,6 +460,12 @@ function togglePause() {
   }
 }
 
+/**
+ * Verarbeitet jede Eingabeänderung.
+ *
+ * Nur neu hinzugefügte Zeichen zählen als Anschlag. Löschen korrigiert also
+ * den Text, erhöht aber weder WPM noch Fehlerzahl.
+ */
 function handleInput() {
   if (!state.active || state.paused) return;
 
@@ -393,6 +491,7 @@ function handleInput() {
   updateHud();
 }
 
+/** Zeichnet die besten fünf Einträge mit textContent und damit ohne HTML-Risiko. */
 function renderHighscores(scores) {
   ui.highscoreList.replaceChildren();
   if (!scores.length) {
@@ -414,6 +513,7 @@ function renderHighscores(scores) {
   });
 }
 
+/** Prüft auch Browser-Speicherwerte, bevor sie angezeigt werden. */
 function isValidHighscore(entry) {
   return (
     entry
@@ -423,6 +523,7 @@ function isValidHighscore(entry) {
   );
 }
 
+/** Normalisiert die Rangliste auf maximal zehn absteigend sortierte Einträge. */
 function sortHighscores(scores) {
   return scores
     .filter(isValidHighscore)
@@ -430,6 +531,7 @@ function sortHighscores(scores) {
     .slice(0, 10);
 }
 
+/** Liest den Pages-Fallback aus localStorage; private Browser-Modi sind erlaubt. */
 function loadBrowserHighscores() {
   try {
     return sortHighscores(JSON.parse(localStorage.getItem(BROWSER_HIGHSCORE_KEY) || '[]'));
@@ -438,6 +540,7 @@ function loadBrowserHighscores() {
   }
 }
 
+/** Speichert nur im Browser, wenn die Python-API auf Pages nicht existiert. */
 function saveBrowserHighscores(entry) {
   const scores = sortHighscores([...loadBrowserHighscores(), entry]);
   try {
@@ -448,6 +551,7 @@ function saveBrowserHighscores(entry) {
   return scores;
 }
 
+/** Bevorzugt die lokale API; GitHub Pages fällt transparent auf localStorage zurück. */
 async function loadHighscores() {
   try {
     const response = await fetch('/api/highscores');
@@ -460,6 +564,7 @@ async function loadHighscores() {
   }
 }
 
+/** Speichert einen Score lokal über API oder – auf Pages – über Browser-Speicher. */
 async function saveHighscore() {
   if (state.hasSubmittedScore || state.score <= 0) return;
   state.hasSubmittedScore = true;
@@ -481,6 +586,7 @@ async function saveHighscore() {
   }
 }
 
+// Alle Ereignisse werden erst nach dem Aufbau der DOM-Referenzen registriert.
 document.querySelectorAll('.mode-button').forEach((button) => {
   button.addEventListener('click', () => startGame(button.dataset.mode));
 });
